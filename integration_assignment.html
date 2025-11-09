@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Методические рекомендации — 2. Выполнение задания (многомодульное приложение C#)</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Таблицы с четкими границами */
+    table.bordered { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 15px; }
+    .bordered th, .bordered td { border: 1px solid #555; padding: 6px 8px; text-align: left; }
+    .bordered th { background: #f0f0f0; font-weight: 600; }
+    .scroll-x { overflow-x: auto; }
+    nav a { margin-right: .5rem; }
+    pre { overflow-x: auto; }
+    code { white-space: pre; }
+    kbd { padding: 2px 4px; border: 1px solid #aaa; border-bottom-width: 2px; border-radius: 3px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Методические рекомендации</h1>
+      <div class="subtitle">2. Выполнение задания — интеграция модулей, архитектура и тестирование</div>
+      <nav>
+        <a href="#desc">Описание задания</a>
+        <a href="#reqs">0. Предварительные требования</a>
+        <a href="#step1">1. Проект и структура</a>
+        <a href="#step2">2. Архитектура (UML → код)</a>
+        <a href="#step3">3. Модель предметной области</a>
+        <a href="#step4">4. Хранилище JSON</a>
+        <a href="#step5">5. Модуль ввода</a>
+        <a href="#step6">6. Отчёты</a>
+        <a href="#step7">7. Интеграция в Program.cs</a>
+        <a href="#step8">8. Ошибки и проверки</a>
+        <a href="#step9">9. Интеграционные тесты</a>
+        <a href="#docs">Документация</a>
+      </nav>
+    </header>
+
+    <section id="desc">
+      <h2>Описание задания</h2>
+      <ol>
+        <li>Разработать многомодульное программное приложение на языке C#.</li>
+        <li>Спроектировать архитектуру программной системы с разделением функций по модулям.</li>
+        <li>Организовать взаимодействие между модулями приложения с использованием методов, классов и интерфейсов.</li>
+        <li>Реализовать обмен данными между компонентами, включая передачу объектов и работу с файлами.</li>
+        <li>Создать не менее трёх логических модулей, таких как:
+          <ul>
+            <li>модуль ввода данных;</li>
+            <li>модуль хранения информации (в формате JSON);</li>
+            <li>модуль уведомлений или отчётности.</li>
+          </ul>
+        </li>
+        <li>Обеспечить корректное взаимодействие модулей и их согласованную работу.</li>
+        <li>Провести отладку и тестирование интегрированной системы для выявления ошибок и проверки функционала.</li>
+      </ol>
+      <p>Подготовить документацию и отчёт по выполненному проекту, включающий описание структуры программы, UML-диаграммы и результаты тестирования.</p>
+    </section>
+
+    <section id="reqs">
+      <h2>0. Предварительные требования</h2>
+      <ul>
+        <li>Установлен <strong>.NET SDK 6+</strong> (<code>dotnet --version</code>).</li>
+        <li>Редактор: <strong>Visual Studio 2022</strong> / <strong>VS Code</strong>.</li>
+        <li>Базовые знания: C#, ООП, JSON, UML.</li>
+        <li>Git (рекомендовано): <code>git init</code>, первый коммит после шага 1.</li>
+      </ul>
+    </section>
+
+    <section id="step1">
+      <h2>1. Создать проект и базовую структуру</h2>
+      <h3>1.1. Инициализация проекта</h3>
+      <pre><code>dotnet new console -n IntegrationApp
+cd IntegrationApp
+mkdir Models Modules Docs</code></pre>
+
+      <h3>1.2. Структура папок (целевой вид)</h3>
+      <pre><code>IntegrationApp/
+├── Program.cs
+├── IntegrationApp.csproj
+├── Models/
+│   └── Domain.cs
+├── Modules/
+│   ├── InputModule.cs
+│   ├── StorageModule.cs
+│   └── ReportModule.cs
+└── Docs/
+    ├── components.puml
+    └── classes.puml</code></pre>
+      <p><strong>Контрольная точка:</strong> проект компилируется <code>dotnet build</code>.</p>
+    </section>
+
+    <section id="step2">
+      <h2>2. Спроектировать архитектуру (UML → код)</h2>
+      <h3>2.1. Диаграмма компонентов (PlantUML)</h3>
+      <pre class="plantuml" data-format="svg">
+@startuml
+skinparam packageStyle rectangle
+title IntegrationApp — Диаграмма компонентов
+
+package "IntegrationApp" {
+  [Program] --> [InputModule]
+  [Program] --> [StorageModule]
+  [Program] --> [ReportModule]
+
+  [InputModule] ..> [Models]
+  [StorageModule] ..> [Models]
+  [ReportModule] ..> [Models]
+}
+@enduml
+      </pre>
+
+      <h3>2.2. Диаграмма классов (PlantUML)</h3>
+      <pre class="plantuml" data-format="svg">
+@startuml
+class TaskItem {
+  +Title : string
+  +Due : DateTime
+  +Description : string
+  +ToString() : string
+}
+
+class StorageModule {
+  -_filePath : string
+  +Load() : List&lt;TaskItem&gt;
+  +Save(List&lt;TaskItem&gt;) : void
+}
+
+class InputModule {
+  +ReadTask() : TaskItem
+}
+
+class ReportModule {
+  +ShowUpcoming(List&lt;TaskItem&gt;, int hours=24) : void
+}
+
+StorageModule ..> TaskItem
+InputModule ..> TaskItem
+ReportModule ..> TaskItem
+@enduml
+      </pre>
+      <p><strong>Контрольная точка:</strong> схемы согласованы с ТЗ: есть минимум три логических модуля (ввод, хранение JSON, отчёт/уведомления).</p>
+    </section>
+
+    <section id="step3">
+      <h2>3. Описать доменную модель (Models)</h2>
+      <p><code>Models/Domain.cs</code></p>
+      <pre><code class="language-cs">namespace IntegrationApp.Models;
+
+public class TaskItem
+{
+    public string Title { get; set; } = string.Empty;
+    public DateTime Due { get; set; }
+    public string Description { get; set; } = string.Empty;
+
+    public override string ToString() =&gt; $"{Title} — {Due:g} — {Description}";
+}</code></pre>
+      <p><strong>Контрольная точка:</strong> класс компилируется, отражает сущность предметной области.</p>
+    </section>
+
+    <section id="step4">
+      <h2>4. Реализовать модуль хранения JSON (StorageModule)</h2>
+      <p><code>Modules/StorageModule.cs</code></p>
+      <pre><code class="language-cs">using System.Text.Json;
+using IntegrationApp.Models;
+
+namespace IntegrationApp.Modules;
+
+public class StorageModule
+{
+    private readonly string _filePath;
+    private readonly JsonSerializerOptions _opts = new() { WriteIndented = true };
+
+    public StorageModule(string filePath = "tasks.json")
+        =&gt; _filePath = filePath;
+
+    public List&lt;TaskItem&gt; Load()
+    {
+        if (!File.Exists(_filePath)) return new List&lt;TaskItem&gt;();
+        var json = File.ReadAllText(_filePath);
+        return JsonSerializer.Deserialize&lt;List&lt;TaskItem&gt;&gt;(json) ?? new List&lt;TaskItem&gt;();
+    }
+
+    public void Save(List&lt;TaskItem&gt; tasks)
+    {
+        var json = JsonSerializer.Serialize(tasks, _opts);
+        File.WriteAllText(_filePath, json);
+    }
+}</code></pre>
+      <p><strong>Контрольная точка:</strong> можно вручную создать <code>tasks.json</code>, проверить чтение/запись.</p>
+    </section>
+
+    <section id="step5">
+      <h2>5. Реализовать модуль ввода с валидацией (InputModule)</h2>
+      <p><code>Modules/InputModule.cs</code></p>
+      <pre><code class="language-cs">using IntegrationApp.Models;
+
+namespace IntegrationApp.Modules;
+
+public static class InputModule
+{
+    public static TaskItem ReadTask()
+    {
+        Console.Write("Название: ");
+        var title = (Console.ReadLine() ?? "").Trim();
+
+        DateTime due;
+        while (true)
+        {
+            Console.Write("Срок (yyyy-MM-dd HH:mm): ");
+            if (DateTime.TryParse(Console.ReadLine(), out due)) break;
+            Console.WriteLine("Некорректная дата/время. Повторите.");
+        }
+
+        Console.Write("Описание: ");
+        var desc = (Console.ReadLine() ?? "").Trim();
+
+        return new TaskItem { Title = title, Due = due, Description = desc };
+    }
+}</code></pre>
+      <p><strong>Контрольная точка:</strong> ввести задачу, получить корректный объект <code>TaskItem</code>.</p>
+    </section>
+
+    <section id="step6">
+      <h2>6. Реализовать модуль отчётов/уведомлений (ReportModule)</h2>
+      <p><code>Modules/ReportModule.cs</code></p>
+      <pre><code class="language-cs">using IntegrationApp.Models;
+
+namespace IntegrationApp.Modules;
+
+public static class ReportModule
+{
+    public static void ShowUpcoming(List&lt;TaskItem&gt; tasks, int hours = 24)
+    {
+        var now = DateTime.Now;
+        var upcoming = tasks
+            .Where(t =&gt; t.Due &gt;= now &amp;&amp; t.Due &lt;= now.AddHours(hours))
+            .OrderBy(t =&gt; t.Due)
+            .ToList();
+
+        if (!upcoming.Any())
+        {
+            Console.WriteLine($"Нет задач в ближайшие {hours} часов.");
+            return;
+        }
+
+        Console.WriteLine($"Ближайшие задачи (&lt;= {hours} ч):");
+        foreach (var t in upcoming) Console.WriteLine("- " + t);
+    }
+}</code></pre>
+      <p><strong>Контрольная точка:</strong> при наличии задач в интервале виден корректный список.</p>
+    </section>
+
+    <section id="step7">
+      <h2>7. Собрать взаимодействие в Program.cs (интеграция модулей)</h2>
+      <p><code>Program.cs</code></p>
+      <pre><code class="language-cs">using IntegrationApp.Models;
+using IntegrationApp.Modules;
+
+Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+var storage = new StorageModule();
+var tasks = storage.Load();
+
+bool exit = false;
+while (!exit)
+{
+    Console.WriteLine("\n=== IntegrationApp ===");
+    Console.WriteLine("1. Добавить задачу");
+    Console.WriteLine("2. Показать ближайшие задачи (24 ч)");
+    Console.WriteLine("3. Сохранить и выйти");
+    Console.Write("Выбор: ");
+    var choice = Console.ReadLine();
+
+    try
+    {
+        switch (choice)
+        {
+            case "1":
+                var t = InputModule.ReadTask();
+                tasks.Add(t);
+                Console.WriteLine("Задача добавлена.");
+                break;
+            case "2":
+                ReportModule.ShowUpcoming(tasks, 24);
+                break;
+            case "3":
+                storage.Save(tasks);
+                Console.WriteLine("Сохранено. Выход...");
+                exit = true;
+                break;
+            default:
+                Console.WriteLine("Неизвестная команда.");
+                break;
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("Ошибка: " + ex.Message);
+    }
+}</code></pre>
+      <p><strong>Контрольная точка:</strong> приложение запускается <code>dotnet run</code>, добавляет задачи, сохраняет <code>tasks.json</code>.</p>
+    </section>
+
+    <section id="step8">
+      <h2>8. Добавить обработку ошибок и логические проверки</h2>
+      <ul>
+        <li>В <code>StorageModule.Save/Load</code> уже есть базовая защита.</li>
+        <li>При вводе дат — повторный запрос.</li>
+        <li>Добавьте дополнительные проверки: пустое название, дата в прошлом и т. п.</li>
+      </ul>
+      <pre><code class="language-cs">if (string.IsNullOrWhiteSpace(title)) throw new ArgumentException("Название не может быть пустым");
+if (due &lt; DateTime.Now) Console.WriteLine("Внимание: срок в прошлом.");</code></pre>
+      <p><strong>Контрольная точка:</strong> негативные сценарии не приводят к аварийному завершению программы.</p>
+    </section>
+
+    <section id="step9">
+      <h2>9. Простые интеграционные тесты (без фреймворка)</h2>
+      <p>Создайте вспомогательный метод для автопроверки связок «ввод → хранение → отчёт»:</p>
+      <pre><code class="language-cs">static void IntegrationSmokeTest()
+{
+    var storage = new StorageModule("test.json");
+    var list = new List&lt;TaskItem&gt;
+    {
+        new() { Title = "Тест", Due = DateTime.Now.AddHours(1), Description = "Smoke" }
+    };
+    storage.Save(list);
+    var read = storage.Load();
+    ReportModule.ShowUpcoming(read, 2);
+    File.Delete("test.json");
+}
+// Запуск один раз вручную:
+// IntegrationSmokeTest();</code></pre>
+      <p><strong>Контрольная точка:</strong> тест подтверждает корректную связку модулей. При желании используйте MSTest/xUnit.</p>
+    </section>
+
+    <section id="docs">
+      <h2>Документация и отчёт</h2>
+      <p>Подготовьте документацию: описание структуры программы, UML-диаграммы (из раздела 2) и результаты тестирования со скриншотами.</p>
+
+      <h3>PlantUML — Диаграмма компонентов</h3>
+      <pre class="plantuml" data-format="svg">
+@startuml
+skinparam packageStyle rectangle
+title IntegrationApp — Диаграмма компонентов
+
+package "IntegrationApp" {
+  [Program] --> [InputModule]
+  [Program] --> [StorageModule]
+  [Program] --> [ReportModule]
+
+  [InputModule] ..> [Models]
+  [StorageModule] ..> [Models]
+  [ReportModule] ..> [Models]
+}
+@enduml
+      </pre>
+
+      <h3>PlantUML — Диаграмма классов</h3>
+      <pre class="plantuml" data-format="svg">
+@startuml
+class TaskItem {
+  +Title : string
+  +Due : DateTime
+  +Description : string
+  +ToString() : string
+}
+
+class StorageModule {
+  -_filePath : string
+  +Load() : List&lt;TaskItem&gt;
+  +Save(List&lt;TaskItem&gt;) : void
+}
+
+class InputModule {
+  +ReadTask() : TaskItem
+}
+
+class ReportModule {
+  +ShowUpcoming(List&lt;TaskItem&gt;, int hours=24) : void
+}
+
+StorageModule ..> TaskItem
+InputModule ..> TaskItem
+ReportModule ..> TaskItem
+@enduml
+      </pre>
+
+      <p>Пример готового приложения: <a href="https://github.com/OlgaKraven/PP.PM.02-testProject.git" target="_blank" rel="noopener">GitHub — PP.PM.02-testProject - https://github.com/OlgaKraven/PP.PM.02-testProject.git</a></p>
+    </section>
+
+   
+
+  <!-- Минимальный клиентский рендерер PlantUML -->
+  <script>
+  (function(){
+    function encode64(data){var r="";for(var i=0;i<data.length;i+=3){if(i+2==data.length){r+=a(data.charCodeAt(i),data.charCodeAt(i+1),0);}else if(i+1==data.length){r+=a(data.charCodeAt(i),0,0);}else{r+=a(data.charCodeAt(i),data.charCodeAt(i+1),data.charCodeAt(i+2));}}return r;function a(b1,b2,b3){var c1=b1>>2;var c2=((b1&0x3)<<4)|(b2>>4);var c3=((b2&0xF)<<2)|(b3>>6);var c4=b3&0x3F;return s(c1&0x3F)+s(c2&0x3F)+s(c3&0x3F)+s(c4&0x3F);}function s(b){if(b<10)return String.fromCharCode(48+b);b-=10;if(b<26)return String.fromCharCode(65+b);b-=26;if(b<26)return String.fromCharCode(97+b);b-=26;if(b==0)return "-";if(b==1)return "_";return "?";}}
+    function deflate(s){if(window.pako&&window.pako.deflateRaw){var d=window.pako.deflateRaw(unescape(encodeURIComponent(s)),{level:9});var str="";for(var i=0;i<d.length;i++)str+=String.fromCharCode(d[i]);return str;}return null;}
+    function render(){var blocks=document.querySelectorAll('pre.plantuml');blocks.forEach(function(pre){var src=pre.textContent.trim();var server=pre.getAttribute('data-server')||'https://www.plantuml.com/plantuml';var format=pre.getAttribute('data-format')||'svg';var deflated=deflate(src);var url=deflated? (server+'/'+format+'/'+encode64(deflated))
+      : (server+'/'+format+'/~h'+Array.from(unescape(encodeURIComponent(src))).map(function(c){return c.charCodeAt(0).toString(16).padStart(2,'0');}).join(''));
+      var img=document.createElement('img');img.alt='PlantUML diagram';img.loading='lazy';img.src=url;var a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';a.appendChild(img);pre.replaceWith(a);});}
+    if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',render);}else{render();}
+  })();
+  </script>
+</body>
+</html>
